@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "478828237671",
+    "project_id": "trueprintpay",
+    "storage_bucket": "trueprintpay.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:478828237671:android:544edfd97e1f0372c295c2",
+        "android_client_info": {
+          "package_name": "com.example.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDQIOP_UzrVi5cIQmHSuet79zngvKPKBYc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
