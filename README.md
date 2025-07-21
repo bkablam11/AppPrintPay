@@ -89,3 +89,15 @@ Voici la liste de toutes les étapes qui ont été complétées pour arriver au 
 2.  Placez le fichier `google-services.json` correct dans le dossier `android/app/`.
 3.  Exécutez `flutter pub get` pour installer les dépendances.
 4.  Lancez l'application avec `flutter run`.
+
+### TAF
+
+- Vérifier et corriger la mise à jour du "Total Payé" après l'enregistrement d'un paiement.
+
+Pourriez-vous décrire les étapes exactes qui mènent au "Total Payé" qui se réinitialise à 0.00 F ? Par exemple, est-ce que cela se produit après avoir fermé et rouvert l'application, après avoir ajouté une nouvelle impression, ou après avoir effectué une autre action ?
+
+
+Analyser le code de `teacher_details_screen.dart` pour comprendre la gestion du "Total Payé".
+Identifier la cause de la réinitialisation du "Total Payé".
+Proposer une solution pour corriger le problème.
+

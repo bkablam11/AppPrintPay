@@ -107,6 +107,12 @@ class _TeacherDetailsScreenState extends State<TeacherDetailsScreen> {
                   listen: false,
                 ).addPayment(teacher.id, teacher.name, amount);
                 Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Paiement enregistré avec succès !'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
               }
             },
           ),
@@ -149,6 +155,7 @@ class _TeacherDetailsScreenState extends State<TeacherDetailsScreen> {
                 body: Center(child: CircularProgressIndicator()),
               );
             }
+            //print('Paiements mis à jour: ${paymentSnapshot.data?.length ?? 0}');
             final payments = paymentSnapshot.data ?? [];
             final totalPaid = payments.fold(
               0.0,
@@ -168,15 +175,17 @@ class _TeacherDetailsScreenState extends State<TeacherDetailsScreen> {
                       elevation: 4,
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildSummaryColumn(
+                            _buildSummaryRow(
                               'Dette Totale',
                               teacher.totalPayment,
                             ),
-                            _buildSummaryColumn('Total Payé', totalPaid),
-                            _buildSummaryColumn(
+                            SizedBox(height: 8),
+                            _buildSummaryRow('Total Payé', totalPaid),
+                            SizedBox(height: 8),
+                            _buildSummaryRow(
                               'Solde Actuel',
                               balance,
                               isBold: true,
@@ -254,15 +263,11 @@ class _TeacherDetailsScreenState extends State<TeacherDetailsScreen> {
     );
   }
 
-  Widget _buildSummaryColumn(
-    String title,
-    double value, {
-    bool isBold = false,
-  }) {
-    return Column(
+  Widget _buildSummaryRow(String title, double value, {bool isBold = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(title, style: Theme.of(context).textTheme.titleMedium),
-        SizedBox(height: 4),
         Text(
           '${value.toStringAsFixed(2)} F',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
