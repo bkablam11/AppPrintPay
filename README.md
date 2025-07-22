@@ -94,7 +94,7 @@ Voici la liste de toutes les étapes qui ont été complétées pour arriver au 
 
 - Vérifier et corriger la mise à jour du "Total Payé" après l'enregistrement d'un paiement.
 
-Pourriez-vous décrire les étapes exactes qui mènent au "Total Payé" qui se réinitialise à 0.00 F ? Par exemple, est-ce que cela se produit après avoir fermé et rouvert l'application, après avoir ajouté une nouvelle impression, ou après avoir effectué une autre action ?
+Pourriez-vous décrire les étapes exactes qui mènent au "Total Payé" qui se réinitialise à 0.00 F ? Par exemple, est-ce que cela se produit après avoir fermé et rouvert l'application, après avoir ajouté une nouvelle impression, ou après avoir effectué une autre action ? Reponse: c est apres avoir naviguer d une fenetre a une autre, la mise a jour se fait mais est reinitaliser a 0.
 
 
 Analyser le code de `teacher_details_screen.dart` pour comprendre la gestion du "Total Payé".

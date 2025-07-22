@@ -1,4 +1,5 @@
 // lib/screens/teacher_details_screen.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -21,6 +22,86 @@ class _TeacherDetailsScreenState extends State<TeacherDetailsScreen> {
   final _paymentFormKey = GlobalKey<FormState>();
   final _paymentAmountController = TextEditingController();
 
+  late FirebaseTeacherService _teacherService;
+  StreamSubscription? _teacherSubscription;
+  StreamSubscription? _paymentsSubscription;
+
+  Teacher? _teacher;
+  double _totalPaid = 0.0;
+
+  bool _isTeacherLoading = true;
+  bool _isPaymentsLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _teacherService = Provider.of<FirebaseTeacherService>(
+      context,
+      listen: false,
+    );
+    _listenForData();
+  }
+
+  void _listenForData() {
+    _teacherSubscription?.cancel();
+    _teacherSubscription = _teacherService
+        .getTeacherById(widget.teacherId)
+        .listen(
+          (teacher) {
+            if (mounted) {
+              setState(() {
+                _teacher = teacher;
+                _isTeacherLoading = false;
+              });
+            }
+          },
+          onError: (error) {
+            print("Error fetching teacher: $error");
+            if (mounted) {
+              setState(() {
+                _isTeacherLoading = false;
+                _error = "Impossible de charger les données de l'enseignant.";
+              });
+            }
+          },
+        );
+
+    _paymentsSubscription?.cancel();
+    _paymentsSubscription = _teacherService
+        .getPaymentsForTeacher(widget.teacherId)
+        .listen(
+          (payments) {
+            if (mounted) {
+              setState(() {
+                _totalPaid = payments.fold(
+                  0.0,
+                  (sum, item) => sum + item.amount,
+                );
+                _isPaymentsLoading = false;
+              });
+            }
+          },
+          onError: (error) {
+            print("Error fetching payments: $error");
+            if (mounted) {
+              setState(() {
+                _isPaymentsLoading = false;
+                // We can default to 0, but the main error will be shown
+              });
+            }
+          },
+        );
+  }
+
+  @override
+  void dispose() {
+    _teacherSubscription?.cancel();
+    _paymentsSubscription?.cancel();
+    _paymentAmountController.dispose();
+    super.dispose();
+  }
+
   void _navigateToAddImpression() {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -41,7 +122,6 @@ class _TeacherDetailsScreenState extends State<TeacherDetailsScreen> {
   }
 
   void _confirmDelete(BuildContext context, String impressionId) {
-    // This now represents deleting a mistaken entry, not a payment
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -57,10 +137,7 @@ class _TeacherDetailsScreenState extends State<TeacherDetailsScreen> {
           TextButton(
             child: Text('Supprimer', style: TextStyle(color: Colors.red)),
             onPressed: () {
-              Provider.of<FirebaseTeacherService>(
-                context,
-                listen: false,
-              ).deleteImpression(widget.teacherId, impressionId);
+              _teacherService.deleteImpression(widget.teacherId, impressionId);
               Navigator.of(ctx).pop();
             },
           ),
@@ -102,10 +179,7 @@ class _TeacherDetailsScreenState extends State<TeacherDetailsScreen> {
             onPressed: () {
               if (_paymentFormKey.currentState!.validate()) {
                 final amount = double.parse(_paymentAmountController.text);
-                Provider.of<FirebaseTeacherService>(
-                  context,
-                  listen: false,
-                ).addPayment(teacher.id, teacher.name, amount);
+                _teacherService.addPayment(teacher.id, teacher.name, amount);
                 Navigator.of(ctx).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -123,143 +197,116 @@ class _TeacherDetailsScreenState extends State<TeacherDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final teacherService = Provider.of<FirebaseTeacherService>(
-      context,
-      listen: false,
-    );
+    if (_isTeacherLoading || _isPaymentsLoading) {
+      return Scaffold(
+        appBar: AppBar(title: Text('Chargement...')),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
-    return StreamBuilder<Teacher>(
-      stream: teacherService.getTeacherById(widget.teacherId),
-      builder: (context, teacherSnapshot) {
-        if (teacherSnapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(
-            appBar: AppBar(),
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-        if (!teacherSnapshot.hasData || teacherSnapshot.hasError) {
-          return Scaffold(
-            appBar: AppBar(),
-            body: Center(child: Text('Erreur ou enseignant non trouvé.')),
-          );
-        }
-        final teacher = teacherSnapshot.data!;
+    if (_error != null) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: Center(child: Text(_error!)),
+      );
+    }
 
-        return StreamBuilder<List<Payment>>(
-          stream: teacherService.getPaymentsForTeacher(widget.teacherId),
-          builder: (context, paymentSnapshot) {
-            if (paymentSnapshot.connectionState == ConnectionState.waiting) {
-              // Show a loading state but keep the teacher data if available
-              return Scaffold(
-                appBar: AppBar(title: Text(teacher.name)),
-                body: Center(child: CircularProgressIndicator()),
-              );
-            }
-            //print('Paiements mis à jour: ${paymentSnapshot.data?.length ?? 0}');
-            final payments = paymentSnapshot.data ?? [];
-            final totalPaid = payments.fold(
-              0.0,
-              (sum, item) => sum + item.amount,
-            );
-            final balance = teacher.totalPayment - totalPaid;
+    if (_teacher == null) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: Center(child: Text('Enseignant non trouvé.')),
+      );
+    }
 
-            return Scaffold(
-              appBar: AppBar(title: Text(teacher.name)),
-              body: Padding(
+    final teacher = _teacher!;
+    final balance = teacher.totalPayment - _totalPaid;
+
+    return Scaffold(
+      appBar: AppBar(title: Text(teacher.name)),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Summary Card
+            Card(
+              elevation: 4,
+              child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Summary Card
-                    Card(
-                      elevation: 4,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildSummaryRow(
-                              'Dette Totale',
-                              teacher.totalPayment,
-                            ),
-                            SizedBox(height: 8),
-                            _buildSummaryRow('Total Payé', totalPaid),
-                            SizedBox(height: 8),
-                            _buildSummaryRow(
-                              'Solde Actuel',
-                              balance,
-                              isBold: true,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 20),
-                    Text(
-                      'Historique des Impressions',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: teacher.impressions.length,
-                        itemBuilder: (context, index) {
-                          final impression = teacher.impressions[index];
-                          return Card(
-                            child: ListTile(
-                              title: Text(
-                                'Date: ${DateFormat.yMd().format(impression.date)}',
-                              ),
-                              subtitle: Text(
-                                'Pages: ${impression.pageCount} | Coût: ${impression.totalCost.toStringAsFixed(2)} F',
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: Icon(Icons.edit, color: Colors.blue),
-                                    onPressed: () =>
-                                        _navigateToEditImpression(impression),
-                                  ),
-                                  IconButton(
-                                    icon: Icon(Icons.delete, color: Colors.red),
-                                    onPressed: () =>
-                                        _confirmDelete(context, impression.id),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
+                    _buildSummaryRow('Dette Totale', teacher.totalPayment),
+                    SizedBox(height: 8),
+                    _buildSummaryRow('Total Payé', _totalPaid),
+                    SizedBox(height: 8),
+                    _buildSummaryRow('Solde Actuel', balance, isBold: true),
                   ],
                 ),
               ),
-              floatingActionButton: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: <Widget>[
-                    FloatingActionButton.extended(
-                      heroTag: 'add_impression_fab',
-                      onPressed: _navigateToAddImpression,
-                      label: Text('Impression'),
-                      icon: Icon(Icons.print),
+            ),
+            SizedBox(height: 20),
+            Text(
+              'Historique des Impressions',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: teacher.impressions.length,
+                itemBuilder: (context, index) {
+                  final impression = teacher.impressions[index];
+                  return Card(
+                    child: ListTile(
+                      title: Text(
+                        'Date: ${DateFormat.yMd().format(impression.date)}',
+                      ),
+                      subtitle: Text(
+                        'Pages: ${impression.pageCount} | Coût: ${impression.totalCost.toStringAsFixed(2)} F',
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.edit, color: Colors.blue),
+                            onPressed: () =>
+                                _navigateToEditImpression(impression),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.delete, color: Colors.red),
+                            onPressed: () =>
+                                _confirmDelete(context, impression.id),
+                          ),
+                        ],
+                      ),
                     ),
-                    SizedBox(width: 16),
-                    FloatingActionButton.extended(
-                      heroTag: 'add_payment_fab',
-                      onPressed: () => _showAddPaymentDialog(teacher),
-                      label: Text('Paiement'),
-                      icon: Icon(Icons.payment),
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
-            );
-          },
-        );
-      },
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: <Widget>[
+            FloatingActionButton.extended(
+              heroTag: 'add_impression_fab',
+              onPressed: _navigateToAddImpression,
+              label: Text('Impression'),
+              icon: Icon(Icons.print),
+            ),
+            SizedBox(width: 16),
+            FloatingActionButton.extended(
+              heroTag: 'add_payment_fab',
+              onPressed: () => _showAddPaymentDialog(teacher),
+              label: Text('Paiement'),
+              icon: Icon(Icons.payment),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
